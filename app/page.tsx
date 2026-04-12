@@ -1,101 +1,69 @@
-import Image from "next/image";
+import Link from "next/link";
+import { CalendarDays, Clock, CreditCard, Mail, BarChart3, Users } from "lucide-react";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <main className="min-h-screen bg-white">
+      {/* Hero */}
+      <header className="bg-indigo-600 text-white">
+        <nav className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 font-bold text-xl">
+            <CalendarDays className="h-6 w-6" /> BookEase
+          </div>
+          <div className="flex gap-3">
+            <Link href="/login" className="px-4 py-2 text-sm rounded-lg border border-white/30 hover:bg-white/10 transition">
+              Sign in
+            </Link>
+            <Link href="/register" className="px-4 py-2 text-sm rounded-lg bg-white text-indigo-600 font-medium hover:bg-indigo-50 transition">
+              Get started
+            </Link>
+          </div>
+        </nav>
+        <div className="max-w-4xl mx-auto px-4 py-20 text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Scheduling Made Simple</h1>
+          <p className="text-xl text-indigo-100 mb-8 max-w-2xl mx-auto">
+            Let your clients book appointments online. Manage your calendar, accept payments, and send automatic reminders.
+          </p>
+          <Link href="/register" className="inline-block bg-white text-indigo-600 font-semibold px-8 py-3 rounded-xl hover:bg-indigo-50 transition text-lg">
+            Start for free &rarr;
+          </Link>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </header>
+
+      {/* Features */}
+      <section className="max-w-6xl mx-auto px-4 py-20">
+        <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Everything you need</h2>
+        <div className="grid md:grid-cols-3 gap-8">
+          {[
+            { icon: CalendarDays, title: "Smart Scheduling", desc: "Set your availability, block off time, and let clients book 24/7." },
+            { icon: CreditCard, title: "Stripe Payments", desc: "Collect booking fees upfront with secure Stripe Checkout." },
+            { icon: Mail, title: "Auto Reminders", desc: "Automated confirmation and 24-hour reminder emails via Resend." },
+            { icon: Clock, title: "Multiple Services", desc: "Define services with custom durations (30/60/90 min) and pricing." },
+            { icon: BarChart3, title: "Dashboard KPIs", desc: "Track bookings, revenue, and cancellation rates at a glance." },
+            { icon: Users, title: "Public Booking Page", desc: "Share your booking link — clients book without signing up." },
+          ].map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="bg-gray-50 rounded-xl p-6">
+              <div className="bg-indigo-100 w-10 h-10 rounded-lg flex items-center justify-center mb-4">
+                <Icon className="h-5 w-5 text-indigo-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">{title}</h3>
+              <p className="text-gray-600 text-sm">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="bg-indigo-50 py-16 text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Ready to streamline your bookings?</h2>
+        <Link href="/register" className="inline-block bg-indigo-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-indigo-700 transition">
+          Create your free account
+        </Link>
+      </section>
+
+      <footer className="border-t border-gray-100 py-8 text-center text-gray-500 text-sm">
+        &copy; {new Date().getFullYear()} BookEase. Built with Next.js, Prisma, Stripe &amp; Resend.
       </footer>
-    </div>
+    </main>
   );
 }
