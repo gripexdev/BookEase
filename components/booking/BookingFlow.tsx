@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { format, addDays, isSameDay, startOfDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Loader2, CalendarX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { formatCurrency, formatTime } from "@/lib/utils";
+import { SlotGridSkeleton } from "@/components/ui/Skeleton";
 
 interface Service {
   id: string;
@@ -129,7 +130,7 @@ export function BookingFlow({ provider, services }: Props) {
   const stepIndex = STEPS.indexOf(step);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Step indicator */}
       <div className="flex items-center gap-2 justify-center">
         {STEPS.map((s, i) => (
@@ -192,7 +193,8 @@ export function BookingFlow({ provider, services }: Props) {
               <button
                 onClick={() => setCalendarOffset((o) => Math.max(0, o - 1))}
                 disabled={calendarOffset === 0}
-                className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30"
+                aria-label="Previous week"
+                className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -201,7 +203,8 @@ export function BookingFlow({ provider, services }: Props) {
               </p>
               <button
                 onClick={() => setCalendarOffset((o) => o + 1)}
-                className="p-1.5 rounded-lg hover:bg-gray-100"
+                aria-label="Next week"
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
@@ -245,12 +248,13 @@ export function BookingFlow({ provider, services }: Props) {
           <p className="text-sm text-gray-500 mb-4">{selectedService?.name} · {selectedService?.duration}min</p>
 
           {loadingSlots ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
-            </div>
+            <SlotGridSkeleton />
           ) : slots.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">
-              <p>No available slots on this day.</p>
+            <div className="text-center py-10">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
+                <CalendarX className="h-5 w-5 text-gray-400" />
+              </div>
+              <p className="text-gray-700 font-medium">No available slots on this day</p>
               <button onClick={() => setStep("Date")} className="mt-2 text-sm text-indigo-600 hover:underline">
                 Choose another date
               </button>
@@ -263,8 +267,8 @@ export function BookingFlow({ provider, services }: Props) {
                   onClick={() => selectTime(time)}
                   className={`py-2.5 px-3 border rounded-lg text-sm font-medium transition ${
                     selectedTime === time
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "border-gray-200 hover:border-indigo-400 hover:text-indigo-700"
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                      : "bg-white border-gray-200 text-gray-800 hover:border-indigo-500 hover:text-indigo-700 hover:bg-indigo-50/40"
                   }`}
                 >
                   {formatTime(time)}

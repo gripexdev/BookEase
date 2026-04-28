@@ -9,10 +9,11 @@ export default async function SettingsPage() {
 
   const providerId = session.user.id;
 
-  const [user, services, availability] = await Promise.all([
+  const [user, services, availability, blockedSlots] = await Promise.all([
     prisma.user.findUnique({ where: { id: providerId } }),
     prisma.service.findMany({ where: { providerId }, orderBy: { createdAt: "asc" } }),
     prisma.availability.findMany({ where: { providerId }, orderBy: { dayOfWeek: "asc" } }),
+    prisma.blockedSlot.findMany({ where: { providerId }, orderBy: { date: "asc" } }),
   ]);
 
   return (
@@ -20,6 +21,7 @@ export default async function SettingsPage() {
       user={JSON.parse(JSON.stringify(user))}
       services={JSON.parse(JSON.stringify(services))}
       availability={JSON.parse(JSON.stringify(availability))}
+      blockedSlots={JSON.parse(JSON.stringify(blockedSlots))}
     />
   );
 }

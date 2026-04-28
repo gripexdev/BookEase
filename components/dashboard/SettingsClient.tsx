@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
-import { Plus, Trash2, Save, User, Briefcase, Clock } from "lucide-react";
+import { Plus, Trash2, Save, User, Briefcase, Clock, CalendarOff } from "lucide-react";
+import { format } from "date-fns";
 import { formatCurrency, DAY_NAMES } from "@/lib/utils";
 
 interface Service {
@@ -30,18 +31,37 @@ interface UserProfile {
   image: string | null;
 }
 
+interface BlockedSlot {
+  id: string;
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+  reason: string | null;
+}
+
 interface Props {
   user: UserProfile;
   services: Service[];
   availability: Availability[];
+  blockedSlots: BlockedSlot[];
 }
 
 const DURATIONS = [30, 60, 90];
 const DAYS = DAY_NAMES.map((name, idx) => ({ idx, name }));
 
-export function SettingsClient({ user: initialUser, services: initialServices, availability: initialAvailability }: Props) {
+export function SettingsClient({
+  user: initialUser,
+  services: initialServices,
+  availability: initialAvailability,
+  blockedSlots: initialBlocked,
+}: Props) {
   const { update } = useSession();
-  const [activeTab, setActiveTab] = useState<"profile" | "services" | "availability">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "services" | "availability" | "blocked">("profile");
+
+  // Blocked dates
+  const [blocked, setBlocked] = useState<BlockedSlot[]>(initialBlocked);
+  const [newBlock, setNewBlock] = useState({ date: "", startTime: "", endTime: "", reason: "" });
+  const [savingBlock, setSavingBlock] = useState(false);
 
   // Profile
   const [profile, setProfile] = useState({
@@ -148,7 +168,38 @@ export function SettingsClient({ user: initialUser, services: initialServices, a
     { id: "profile" as const, label: "Profile", icon: User },
     { id: "services" as const, label: "Services", icon: Briefcase },
     { id: "availability" as const, label: "Availability", icon: Clock },
+    { id: "blocked" as const, label: "Blocked Dates", icon: CalendarOff },
   ];
+
+  const addBlocked = async () => {
+    if (!newBlock.date) return toast.error("Date required");
+    setSavingBlock(true);
+    const res = await fetch("/api/blocked-slots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newBlock),
+    });
+    const data = await res.json();
+    setSavingBlock(false);
+    if (res.ok) {
+      setBlocked((prev) => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)));
+      setNewBlock({ date: "", startTime: "", endTime: "", reason: "" });
+      toast.success("Date blocked");
+    } else {
+      toast.error(data.error || "Failed to block date");
+    }
+  };
+
+  const deleteBlocked = async (id: string) => {
+    if (!confirm("Remove this blocked date?")) return;
+    const res = await fetch(`/api/blocked-slots/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setBlocked((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Removed");
+    } else {
+      toast.error("Failed to remove");
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -349,6 +400,102 @@ export function SettingsClient({ user: initialUser, services: initialServices, a
             <Save className="h-4 w-4" />
             {savingAvail ? "Saving…" : "Save Availability"}
           </button>
+        </div>
+      )}
+
+      {/* Blocked Dates Tab */}
+      {activeTab === "blocked" && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4 animate-fade-in">
+          <div>
+            <h2 className="text-lg font-semibold">Blocked Dates</h2>
+            <p className="text-sm text-gray-500">
+              Block specific dates or time ranges for vacations, breaks, or personal time.
+            </p>
+          </div>
+
+          {/* Existing blocked */}
+          <div className="space-y-2">
+            {blocked.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">No blocked dates yet.</p>
+            ) : (
+              blocked.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:border-gray-200 transition"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {format(new Date(b.date), "EEEE, MMMM d, yyyy")}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {b.startTime && b.endTime
+                        ? `${b.startTime} – ${b.endTime}`
+                        : "All day"}
+                      {b.reason && <span className="ml-2 text-gray-400 italic">&middot; {b.reason}</span>}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => deleteBlocked(b.id)}
+                    aria-label="Remove blocked date"
+                    className="p-1.5 text-gray-400 hover:text-red-600 transition"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Add new block */}
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-sm font-medium text-gray-700 mb-3">Block a Date</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={newBlock.date}
+                  onChange={(e) => setNewBlock((b) => ({ ...b, date: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Reason (optional)</label>
+                <input
+                  value={newBlock.reason}
+                  onChange={(e) => setNewBlock((b) => ({ ...b, reason: e.target.value }))}
+                  placeholder="Vacation, lunch break…"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">From (leave blank for all day)</label>
+                <input
+                  type="time"
+                  value={newBlock.startTime}
+                  onChange={(e) => setNewBlock((b) => ({ ...b, startTime: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">To</label>
+                <input
+                  type="time"
+                  value={newBlock.endTime}
+                  onChange={(e) => setNewBlock((b) => ({ ...b, endTime: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            <button
+              onClick={addBlocked}
+              disabled={savingBlock}
+              className="mt-3 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-60"
+            >
+              <Plus className="h-4 w-4" />
+              {savingBlock ? "Adding…" : "Block Date"}
+            </button>
+          </div>
         </div>
       )}
     </div>
