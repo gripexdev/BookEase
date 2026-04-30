@@ -3,6 +3,7 @@ import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { generateCancelToken } from "@/lib/utils";
 import { addMinutes } from "date-fns";
+import { getLimits, isBookingLimitReached } from "@/lib/subscription";
 
 export async function POST(req: Request) {
   const { serviceId, startTime, clientName, clientEmail, notes } = await req.json();
@@ -16,6 +17,33 @@ export async function POST(req: Request) {
     include: { provider: true },
   });
   if (!service) return NextResponse.json({ error: "Service not found" }, { status: 404 });
+
+  // Plan gate: only Pro/Business providers can collect online payments.
+  const providerState = {
+    plan: service.provider.plan,
+    planStatus: service.provider.planStatus,
+    trialEndsAt: service.provider.trialEndsAt,
+    currentPeriodEnd: service.provider.currentPeriodEnd,
+  };
+  const providerLimits = getLimits(providerState);
+  if (!providerLimits.onlinePayments) {
+    return NextResponse.json(
+      {
+        error:
+          "This provider doesn't have online payments enabled. Please choose pay-on-site or contact them directly.",
+      },
+      { status: 402 }
+    );
+  }
+
+  // And the same monthly booking cap as the free path.
+  const limitReached = await isBookingLimitReached(service.providerId, providerState);
+  if (limitReached) {
+    return NextResponse.json(
+      { error: "This provider has reached their monthly booking limit." },
+      { status: 503 }
+    );
+  }
 
   const start = new Date(startTime);
   const end = addMinutes(start, service.duration);

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateCancelToken } from "@/lib/utils";
 import { addMinutes } from "date-fns";
+import { isBookingLimitReached } from "@/lib/subscription";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -34,6 +35,23 @@ export async function POST(req: Request) {
     include: { provider: true },
   });
   if (!service) return NextResponse.json({ error: "Service not found" }, { status: 404 });
+
+  // Enforce the provider's monthly booking cap (Starter: 20/mo).
+  const limitReached = await isBookingLimitReached(service.providerId, {
+    plan: service.provider.plan,
+    planStatus: service.provider.planStatus,
+    trialEndsAt: service.provider.trialEndsAt,
+    currentPeriodEnd: service.provider.currentPeriodEnd,
+  });
+  if (limitReached) {
+    return NextResponse.json(
+      {
+        error:
+          "This provider has reached their monthly booking limit. Please try again next month or contact them directly.",
+      },
+      { status: 503 }
+    );
+  }
 
   const start = new Date(startTime);
   const end = addMinutes(start, service.duration);

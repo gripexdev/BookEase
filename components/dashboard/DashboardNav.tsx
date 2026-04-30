@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { CalendarDays, LayoutDashboard, Settings, LogOut, ExternalLink } from "lucide-react";
+import { CalendarDays, LayoutDashboard, Settings, LogOut, ExternalLink, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
 
 export function DashboardNav({ user }: Props) {

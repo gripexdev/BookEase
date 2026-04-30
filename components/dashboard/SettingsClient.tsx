@@ -114,6 +114,8 @@ export function SettingsClient({
       setServices((prev) => [...prev, data]);
       setNewService({ name: "", duration: 60, price: "" });
       toast.success("Service added");
+    } else if (data.code === "PLAN_LIMIT") {
+      toast.error(data.error, { duration: 5000 });
     } else {
       toast.error(data.error || "Failed to add service");
     }

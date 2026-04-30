@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { BookingFlow } from "@/components/booking/BookingFlow";
+import { getLimits } from "@/lib/subscription";
 
 interface Props {
   params: { providerSlug: string };
@@ -25,6 +27,13 @@ export default async function ProviderBookingPage({ params }: Props) {
   });
 
   if (!provider) notFound();
+
+  const limits = getLimits({
+    plan: provider.plan,
+    planStatus: provider.planStatus,
+    trialEndsAt: provider.trialEndsAt,
+    currentPeriodEnd: provider.currentPeriodEnd,
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -55,9 +64,22 @@ export default async function ProviderBookingPage({ params }: Props) {
           <BookingFlow
             provider={JSON.parse(JSON.stringify(provider))}
             services={JSON.parse(JSON.stringify(provider.services))}
+            paymentsEnabled={limits.onlinePayments}
           />
         )}
       </div>
+
+      {/* "Powered by BookEase" footer for Starter providers (plan-driven branding). */}
+      {!limits.customBranding && (
+        <div className="text-center py-6">
+          <Link
+            href="/"
+            className="text-xs text-gray-400 hover:text-gray-600 transition"
+          >
+            Powered by <span className="font-semibold text-gray-500">BookEase</span>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

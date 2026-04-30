@@ -53,6 +53,103 @@ BookEase is a production-ready booking and scheduling web application. Service p
 
 ---
 
+## Subscription Plans
+
+BookEase uses a **3-tier SaaS model** to monetize while keeping the product accessible. Every new provider starts with a **14-day free Pro trial** (no card required), then drops to Starter after the trial ends unless they subscribe.
+
+### Plan Comparison
+
+| Feature | **Starter** (Free) | **Pro** ($19/mo) | **Business** ($49/mo) |
+|---------|---|---|---|
+| **Services** | 1 | Unlimited | Unlimited |
+| **Bookings/month** | 20 | Unlimited | Unlimited |
+| **Online payments** | ❌ | ✅ | ✅ |
+| **Email reminders** | ❌ | ✅ | ✅ |
+| **Google Calendar sync** | ❌ | ✅ | ✅ |
+| **Custom branding** | ❌ | ✅ | ✅ |
+| **Team members** | 1 | 1 | Up to 5 |
+| **SMS reminders** | ❌ | ❌ | ✅ |
+| **Custom domain** | ❌ | ❌ | ✅ |
+| **Priority support** | ❌ | ✅ | ✅ |
+
+### Pricing
+
+- **Starter**: Free forever (acquisition funnel)
+- **Pro**: $19/month or $182/year (save 20% with annual)
+- **Business**: $49/month or $470/year
+
+All prices are in USD. Users can switch plans or cancel anytime. Annual billing provides a ~20% discount.
+
+### Onboarding & Trials
+
+1. **Sign up** → New providers automatically get `plan=PRO` + `planStatus=TRIALING` + 14-day trial countdown
+2. **No card required** → They can test all Pro features immediately
+3. **Trial expires** → The subscription helper (`getEffectivePlan()`) transparently downgrades expired trials to Starter
+4. **Subscribe or lose access** → To keep Pro features after the trial, they must subscribe via Stripe Checkout
+
+### Paywalls & Limits Enforcement
+
+Limits are enforced consistently across the API:
+
+| Limit | Enforced at | Response |
+|-------|---|---|
+| **Max services** (Starter = 1) | `POST /api/services` | 402 + plan-limit error |
+| **Max bookings/month** (Starter = 20) | `POST /api/bookings` & `/api/stripe/checkout` | 503 (service unavailable) |
+| **Online payments** (Pro+) | `POST /api/stripe/checkout` | 402 (forced to pay-on-site) |
+| **Email reminders** (Pro+) | `POST /api/emails/reminder` cron | Skipped for Starter bookings |
+| **Calendar sync** (Pro+) | `GET /api/calendar/connect` | Redirects to billing page |
+| **Custom branding** | Public booking page footer | "Powered by BookEase" shown for Starter |
+
+### Billing Page
+
+Providers access `/dashboard/billing` to:
+- See their **current plan** + renewal date
+- View **trial countdown** (if trialing)
+- Check **usage stats** (services created, bookings this month)
+- Click **"Manage billing"** → Opens Stripe Customer Portal for:
+  - Update payment method
+  - Change plan
+  - View invoices
+  - Cancel subscription
+- **Upgrade / downgrade** directly in the dashboard using the plan comparison table
+
+### Stripe Integration
+
+- **Checkout**: `POST /api/billing/checkout` creates a subscription Checkout session
+  - Reuses or creates the Stripe customer on first use
+  - Supports both monthly and yearly billing intervals
+  - Allows promo codes
+- **Webhooks**: Updated to handle:
+  - `customer.subscription.created` — Initial subscription
+  - `customer.subscription.updated` — Plan changes, renewals, status changes
+  - `customer.subscription.deleted` — Cancellation
+  - `invoice.payment_failed` — Payment issues (marks account PAST_DUE)
+- **Customer Portal**: `POST /api/billing/portal` opens Stripe's hosted interface
+
+### Plan State & Transparency
+
+The system tracks subscription state on the `User` row:
+
+```typescript
+plan              // "STARTER" | "PRO" | "BUSINESS"
+planStatus        // "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "INCOMPLETE"
+planInterval      // "monthly" | "yearly"
+stripeCustomerId  // Stripe customer ID
+stripeSubscriptionId  // Stripe subscription ID
+stripePriceId     // Active price ID (maps to plan + interval)
+currentPeriodEnd  // When the current billing period ends
+trialEndsAt       // Expiry of the free trial (if TRIALING)
+cancelAtPeriodEnd // If true, plan will cancel at period end (not immediately)
+```
+
+**Helper functions** (`lib/subscription.ts`) ensure consistent plan resolution:
+- `getEffectivePlan()` — Returns what the user *actually* has access to right now (handles trial expiry, PAST_DUE, canceled with paid-through period)
+- `getLimits()` — Returns the feature-flag object for a plan
+- `isServiceLimitReached()` — Async check for service cap
+- `isBookingLimitReached()` — Async check for monthly booking cap
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -158,6 +255,13 @@ STRIPE_SECRET_KEY="sk_test_..."
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 
+# Stripe subscription pricing (create in Dashboard → Products, then copy price IDs)
+# https://dashboard.stripe.com/products
+STRIPE_PRICE_PRO_MONTHLY="price_..."
+STRIPE_PRICE_PRO_YEARLY="price_..."
+STRIPE_PRICE_BUSINESS_MONTHLY="price_..."
+STRIPE_PRICE_BUSINESS_YEARLY="price_..."
+
 # Resend (https://resend.com/api-keys)
 RESEND_API_KEY="re_..."
 EMAIL_FROM="noreply@yourdomain.com"
@@ -197,8 +301,10 @@ Paste the printed webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
 | `POST` | `/api/services` | Provider | Add a service |
 | `DELETE` | `/api/services/[id]` | Provider | Remove a service |
 | `PATCH` | `/api/provider/profile` | Provider | Update profile & slug |
-| `POST` | `/api/stripe/checkout` | — | Create Stripe Checkout session |
-| `POST` | `/api/webhooks/stripe` | Stripe sig | Handle payment confirmation |
+| `POST` | `/api/stripe/checkout` | — | Create Stripe Checkout session (booking payment) |
+| `POST` | `/api/billing/checkout` | Provider | Create subscription Checkout session |
+| `POST` | `/api/billing/portal` | Provider | Open Stripe Customer Portal |
+| `POST` | `/api/webhooks/stripe` | Stripe sig | Handle booking payment, subscription lifecycle, payment failures |
 | `POST` | `/api/emails/reminder` | Cron secret | Send 24 h reminder emails |
 | `GET` | `/api/calendar/connect` | Provider | Start Google Calendar OAuth |
 | `GET` | `/api/calendar/callback` | — | Google Calendar OAuth callback |
@@ -218,9 +324,12 @@ BookEase/
 │   │   ├── calendar/             # Google Calendar OAuth
 │   │   ├── emails/reminder/      # Cron-triggered 24h reminders
 │   │   ├── provider/profile/     # Profile update
-│   │   ├── services/             # Service CRUD
-│   │   ├── stripe/checkout/      # Stripe Checkout session
-│   │   └── webhooks/stripe/      # Stripe webhook handler
+│   │   ├── services/             # Service CRUD (with plan limits)
+│   │   ├── stripe/checkout/      # Stripe Checkout session (bookings)
+│   │   ├── billing/              # Subscription management
+│   │   │   ├── checkout/         # Create subscription Checkout
+│   │   │   └── portal/           # Stripe Customer Portal
+│   │   └── webhooks/stripe/      # Stripe webhook handler (payments + subscriptions)
 │   ├── book/
 │   │   ├── [providerSlug]/       # Public booking page
 │   │   ├── cancel/               # Booking cancellation page
@@ -239,11 +348,17 @@ BookEase/
 │   └── dashboard/
 │       ├── DashboardClient.tsx   # KPI cards + booking list
 │       ├── DashboardNav.tsx      # Top navigation bar
-│       └── SettingsClient.tsx    # Profile / services / availability tabs
+│       ├── SettingsClient.tsx    # Profile / services / availability tabs
+│       ├── BillingClient.tsx     # Plan card, usage, upgrade UI
+│       └── RescheduleModal.tsx   # Rescheduling with calendar picker
+│   └── pricing/
+│       └── PricingTable.tsx      # Reusable pricing grid (public + dashboard)
 ├── lib/
 │   ├── auth.ts                   # NextAuth config
 │   ├── email.ts                  # Resend helpers (confirmation + reminder)
 │   ├── googleCalendar.ts         # Google Calendar helpers
+│   ├── plans.ts                  # Subscription plan definitions + limits
+│   ├── subscription.ts           # Plan helpers (getEffectivePlan, limit checks)
 │   ├── prisma.ts                 # Prisma singleton
 │   ├── stripe.ts                 # Stripe client
 │   └── utils.ts                  # cn, formatCurrency, generateTimeSlots…
@@ -270,11 +385,11 @@ User ──< Service ──< Booking
 
 | Model | Key fields |
 |---|---|
-| `User` | id, name, email, password, role, slug, bio, serviceType |
+| `User` | id, name, email, password, role, slug, bio, serviceType, **plan, planStatus, planInterval, stripeCustomerId, stripeSubscriptionId, stripePriceId, currentPeriodEnd, trialEndsAt, cancelAtPeriodEnd** |
 | `Service` | id, name, duration, price, providerId |
 | `Availability` | id, providerId, dayOfWeek, startTime, endTime |
-| `BlockedSlot` | id, providerId, date, startTime, endTime |
-| `Booking` | id, clientName, clientEmail, serviceId, startTime, endTime, status, paymentStatus, cancelToken |
+| `BlockedSlot` | id, providerId, date, startTime, endTime, reason |
+| `Booking` | id, clientName, clientEmail, serviceId, startTime, endTime, status, paymentStatus, notes, cancelToken, reminderSent |
 
 ---
 

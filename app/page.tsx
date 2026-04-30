@@ -16,7 +16,10 @@ export default function HomePage() {
             </div>
             BookEase
           </Link>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <Link href="/pricing" className="hidden sm:inline px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
+              Pricing
+            </Link>
             <Link href="/login" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
               Sign in
             </Link>
@@ -182,6 +185,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-gray-500">
           <p>&copy; {new Date().getFullYear()} BookEase. Built with Next.js, Prisma, Stripe &amp; Resend.</p>
           <div className="flex gap-4">
+            <Link href="/pricing" className="hover:text-gray-900 transition">Pricing</Link>
             <Link href="/login" className="hover:text-gray-900 transition">Sign in</Link>
             <Link href="/register" className="hover:text-gray-900 transition">Sign up</Link>
           </div>

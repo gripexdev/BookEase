@@ -31,8 +31,23 @@ export async function POST(req: Request) {
       slugExists = await prisma.user.findUnique({ where: { slug } });
     }
 
+    // Every new account gets 14 days of Pro on the house — no card required.
+    // After trialEndsAt the subscription helper transparently downgrades them
+    // to Starter unless they've subscribed via Stripe Checkout.
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
     const user = await prisma.user.create({
-      data: { name, email, password: hashed, slug, role: "PROVIDER" },
+      data: {
+        name,
+        email,
+        password: hashed,
+        slug,
+        role: "PROVIDER",
+        plan: "PRO",
+        planStatus: "TRIALING",
+        trialEndsAt,
+      },
     });
 
     return NextResponse.json({ id: user.id, email: user.email, name: user.name }, { status: 201 });

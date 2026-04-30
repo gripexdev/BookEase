@@ -24,12 +24,15 @@ interface Provider {
 interface Props {
   provider: Provider;
   services: Service[];
+  /** Whether the provider's plan allows online payments. When false, paid
+   *  services fall through to pay-on-site automatically. */
+  paymentsEnabled?: boolean;
 }
 
 const STEPS = ["Service", "Date", "Time", "Details", "Confirm"] as const;
 type Step = (typeof STEPS)[number];
 
-export function BookingFlow({ provider, services }: Props) {
+export function BookingFlow({ provider, services, paymentsEnabled = true }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("Service");
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -40,7 +43,8 @@ export function BookingFlow({ provider, services }: Props) {
   const [calendarOffset, setCalendarOffset] = useState(0); // weeks offset
   const [form, setForm] = useState({ name: "", email: "", notes: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [payOnSite, setPayOnSite] = useState(false);
+  // If the provider can't accept online payments, force pay-on-site.
+  const [payOnSite, setPayOnSite] = useState(!paymentsEnabled);
 
   const today = startOfDay(new Date());
   const weekStart = addDays(today, calendarOffset * 7);
@@ -82,8 +86,8 @@ export function BookingFlow({ provider, services }: Props) {
       ...selectedTime.split(":").map(Number) as [number, number]
     ).toISOString();
 
-    // If paid service and not pay on site, go to Stripe
-    if (selectedService.price > 0 && !payOnSite) {
+    // If paid service, payments are enabled, and user didn't opt for pay-on-site, go to Stripe
+    if (selectedService.price > 0 && paymentsEnabled && !payOnSite) {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -316,7 +320,7 @@ export function BookingFlow({ provider, services }: Props) {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
             </div>
-            {selectedService && selectedService.price > 0 && (
+            {selectedService && selectedService.price > 0 && paymentsEnabled && (
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"
@@ -326,6 +330,11 @@ export function BookingFlow({ provider, services }: Props) {
                 />
                 Pay on site (skip online payment)
               </label>
+            )}
+            {selectedService && selectedService.price > 0 && !paymentsEnabled && (
+              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                This provider accepts payment on site only.
+              </p>
             )}
           </div>
           <button
@@ -357,7 +366,9 @@ export function BookingFlow({ provider, services }: Props) {
             <div className="border-t border-gray-100 pt-3 flex justify-between">
               <span className="font-semibold text-gray-900">Total</span>
               <span className="font-bold text-indigo-600 text-lg">
-                {payOnSite ? `${formatCurrency(selectedService.price)} (pay on site)` : formatCurrency(selectedService.price)}
+                {(payOnSite || !paymentsEnabled)
+                  ? `${formatCurrency(selectedService.price)} (pay on site)`
+                  : formatCurrency(selectedService.price)}
               </span>
             </div>
           </div>
@@ -369,7 +380,7 @@ export function BookingFlow({ provider, services }: Props) {
           >
             {submitting ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</>
-            ) : selectedService.price > 0 && !payOnSite ? (
+            ) : selectedService.price > 0 && paymentsEnabled && !payOnSite ? (
               "Pay & Book →"
             ) : (
               "Confirm Booking →"

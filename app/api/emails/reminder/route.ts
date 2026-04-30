@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendReminderEmail } from "@/lib/email";
 import { addHours } from "date-fns";
+import { getLimits } from "@/lib/subscription";
 
 // This endpoint is meant to be called by a cron job every hour (or daily at a set time)
 // Protect it with a secret header
@@ -27,9 +28,21 @@ export async function POST(req: Request) {
     include: { service: { include: { provider: true } } },
   });
 
+  // Only send reminders for providers whose plan includes them.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eligible = (bookings as any[]).filter((b) => {
+    const p = b.service.provider;
+    return getLimits({
+      plan: p.plan,
+      planStatus: p.planStatus,
+      trialEndsAt: p.trialEndsAt,
+      currentPeriodEnd: p.currentPeriodEnd,
+    }).emailReminders;
+  });
+
   const results = await Promise.allSettled(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    bookings.map(async (booking: any) => {
+    eligible.map(async (booking: any) => {
       await sendReminderEmail(booking);
       await prisma.booking.update({
         where: { id: booking.id },
@@ -41,6 +54,7 @@ export async function POST(req: Request) {
 
   const sent = results.filter((r) => r.status === "fulfilled").length;
   const failed = results.filter((r) => r.status === "rejected").length;
+  const skipped = bookings.length - eligible.length;
 
-  return NextResponse.json({ sent, failed, total: bookings.length });
+  return NextResponse.json({ sent, failed, skipped, total: bookings.length });
 }
